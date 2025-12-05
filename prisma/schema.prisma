@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  firstName    String    @map("first_name") @db.VarChar(100)
+  lastName     String    @map("last_name") @db.VarChar(100)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  accountType  String    @map("account_type") @db.VarChar(20)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  
+  events       Event[]   @relation("OrganizerEvents")
+  tickets      Ticket[]
+  
+  @@map("users")
+}
+
+model Event {
+  id           Int       @id @default(autoincrement())
+  organizerId  Int       @map("organizer_id")
+  title        String    @db.VarChar(255)
+  description  String    @db.Text
+  category     String    @db.VarChar(50)
+  eventDate    DateTime  @map("event_date") @db.Date
+  startTime    DateTime  @map("start_time") @db.Time
+  endTime      DateTime  @map("end_time") @db.Time
+  eventType    String    @map("event_type") @db.VarChar(20)
+  venue        String?   @db.VarChar(255)
+  location     String?   @db.Text
+  ticketType   String    @map("ticket_type") @db.VarChar(20)
+  ticketPrice  Decimal?  @map("ticket_price") @db.Decimal(10, 2)
+  totalTickets Int       @map("total_tickets")
+  ticketsSold  Int       @default(0) @map("tickets_sold")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  
+  organizer    User      @relation("OrganizerEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  tickets      Ticket[]
+  
+  @@map("events")
+}
+
+model Ticket {
+  id           Int       @id @default(autoincrement())
+  eventId      Int       @map("event_id")
+  userId       Int       @map("user_id")
+  ticketCode   String    @unique @map("ticket_code") @db.VarChar(50)
+  purchaseDate DateTime  @default(now()) @map("purchase_date")
+  amountPaid   Decimal   @map("amount_paid") @db.Decimal(10, 2)
+  status       String    @default("active") @db.VarChar(20)
+  
+  event        Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("tickets")
+}
