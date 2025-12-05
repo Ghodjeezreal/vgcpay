@@ -45,7 +45,7 @@ export async function GET(
 
     // Calculate tickets sold
     const ticketsSold = event.tickets.filter(
-      (ticket) => ticket.status === "confirmed"
+      (ticket: { id: number; status: string }) => ticket.status === "confirmed"
     ).length;
 
     const formattedEvent = {
