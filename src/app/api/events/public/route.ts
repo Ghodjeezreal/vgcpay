@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Format the events for the response
-    const formattedEvents = events.map(event => ({
+    const formattedEvents = events.map((event: typeof events[0]) => ({
       id: event.id,
       title: event.title,
       description: event.description,
