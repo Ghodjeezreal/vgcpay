@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
     // Format the events for the response
     const formattedEvents = events.map((event: typeof events[0]) => ({
       id: event.id,
+      slug: event.slug,
       title: event.title,
       description: event.description,
       category: event.category,
@@ -44,6 +45,8 @@ export async function GET(request: NextRequest) {
       ticketType: event.ticketType,
       ticketPrice: event.ticketPrice,
       totalTickets: event.totalTickets,
+      imageUrl: event.imageUrl,
+      bannerUrl: event.bannerUrl,
       organizerName: `${event.organizer.firstName} ${event.organizer.lastName}`,
       createdAt: event.createdAt
     }));

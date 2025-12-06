@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FaCalendar, FaLaptop, FaTicket, FaRightFromBracket } from "react-icons/fa6";
 import { FaMapMarkerAlt } from "react-icons/fa";
@@ -9,6 +10,7 @@ import { FaSearch } from "react-icons/fa";
 
 interface Event {
   id: string;
+  slug: string;
   title: string;
   description: string;
   category: string;
@@ -21,6 +23,8 @@ interface Event {
   ticketType: string;
   ticketPrice: number | null;
   totalTickets: number;
+  imageUrl: string | null;
+  bannerUrl: string | null;
   organizerName: string;
 }
 
@@ -253,12 +257,22 @@ export default function AttendeeDashboard() {
             {filteredEvents.map((event) => (
               <Link
                 key={event.id}
-                href={`/events/${event.id}`}
+                href={`/events/${event.slug}`}
                 className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden"
               >
-                {/* Event Image Placeholder */}
-                <div className="h-48 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center">
-                  <FaTicket className="text-6xl text-white opacity-50" />
+                {/* Event Image */}
+                <div className="h-48 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center relative overflow-hidden">
+                  {event.imageUrl ? (
+                    <Image
+                      src={event.imageUrl}
+                      alt={event.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    />
+                  ) : (
+                    <FaTicket className="text-6xl text-white opacity-50" />
+                  )}
                 </div>
 
                 {/* Event Details */}

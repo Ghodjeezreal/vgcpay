@@ -17,7 +17,7 @@ export default function PricingPage() {
       <div className="max-w-4xl mx-auto px-6 py-16">
         <div className="bg-white text-gray-900 border-2 border-[#353595] rounded-2xl p-8 md:p-12 shadow-lg">
           <div className="text-center mb-12">
-            <h2 className="text-5xl font-bold text-[#353595] mb-2">5% + ₦100</h2>
+            <h2 className="text-5xl font-bold text-[#353595] mb-2">10% + ₦200</h2>
             <p className="text-gray-600 text-lg">per paid ticket</p>
           </div>
 
@@ -44,7 +44,7 @@ export default function PricingPage() {
               </h3>
               <ul className="space-y-2 text-gray-700">
                 <li>• No fee on free tickets</li>
-                <li>• 5% + ₦100 fee per paid ticket</li>
+                <li>• 10% + ₦200 fee per paid ticket</li>
                 <li>• Pass online ticket fees to attendees</li>
                 <li>• Ability to manage ticket inventory</li>
               </ul>
@@ -139,7 +139,7 @@ export default function PricingPage() {
               <p className="font-semibold">Equipment rentals</p>
             </div>
             <div className="bg-white p-6 rounded-lg">
-              <p className="font-semibold">VGC Events point of sale</p>
+              <p className="font-semibold">VGC Events point of sales</p>
             </div>
             <div className="bg-white p-6 rounded-lg">
               <p className="font-semibold">Key account manager</p>

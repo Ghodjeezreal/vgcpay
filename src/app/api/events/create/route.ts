@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { generateSlug } from '@/lib/utils';
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
       ticketType,
       ticketPrice,
       totalTickets,
+      feeBearer,
+      imageUrl,
+      bannerUrl,
     } = await request.json();
 
     // Validate required fields
@@ -43,10 +47,21 @@ export async function POST(request: Request) {
       );
     }
 
+    // Generate unique slug
+    let slug = generateSlug(title);
+    const existingEvent = await prisma.event.findUnique({
+      where: { slug }
+    });
+    
+    if (existingEvent) {
+      slug = `${slug}-${Date.now()}`;
+    }
+
     // Create event
     const event = await prisma.event.create({
       data: {
         organizerId: parseInt(organizerId),
+        slug,
         title,
         description,
         category,
@@ -58,8 +73,11 @@ export async function POST(request: Request) {
         location: eventType === 'physical' ? location : null,
         ticketType,
         ticketPrice: ticketType === 'paid' ? parseFloat(ticketPrice) : null,
+        feeBearer: ticketType === 'paid' && feeBearer ? feeBearer : 'organizer',
         totalTickets: parseInt(totalTickets),
         ticketsSold: 0,
+        imageUrl: imageUrl || null,
+        bannerUrl: bannerUrl || null,
       },
     });
 
@@ -69,6 +87,7 @@ export async function POST(request: Request) {
         message: 'Event created successfully',
         event: {
           id: event.id,
+          slug: event.slug,
           title: event.title,
           eventDate: event.eventDate,
         },

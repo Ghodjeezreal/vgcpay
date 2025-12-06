@@ -7,34 +7,28 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const eventId = parseInt(id);
 
-    if (isNaN(eventId)) {
-      return NextResponse.json(
-        { error: "Invalid event ID" },
-        { status: 400 }
-      );
-    }
-
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
+    // Try to find event by slug first, then by ID for backward compatibility
+    let event = await prisma.event.findUnique({
+      where: { slug: id },
       include: {
         organizer: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              paystackSplitCode: true,
+            },
+          },
+          tickets: {
+            select: {
+              id: true,
+              status: true,
+            },
           },
         },
-        tickets: {
-          select: {
-            id: true,
-            status: true,
-          },
-        },
-      },
-    });
+      });
 
     if (!event) {
       return NextResponse.json(
@@ -61,13 +55,18 @@ export async function GET(
       location: event.location,
       ticketType: event.ticketType,
       ticketPrice: event.ticketPrice,
+      platformFeePercent: event.platformFeePercent,
+      feeBearer: event.feeBearer,
       totalTickets: event.totalTickets,
       ticketsSold: ticketsSold,
       ticketsAvailable: event.totalTickets - ticketsSold,
+      imageUrl: event.imageUrl,
+      bannerUrl: event.bannerUrl,
       organizer: {
         id: event.organizer.id,
         name: `${event.organizer.firstName} ${event.organizer.lastName}`,
         email: event.organizer.email,
+        paystackSplitCode: event.organizer.paystackSplitCode,
       },
       createdAt: event.createdAt,
     };

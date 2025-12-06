@@ -5,11 +5,16 @@ import Link from "next/link";
 import { FaLocationDot, FaLaptop, FaGift, FaCreditCard } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from 'react-hot-toast';
+import Image from "next/image";
 
 export default function CreateEventPage() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [bannerPreview, setBannerPreview] = useState<string>("");
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -23,6 +28,7 @@ export default function CreateEventPage() {
     ticketType: "paid",
     ticketPrice: "",
     totalTickets: "",
+    feeBearer: "organizer",
   });
 
   useEffect(() => {
@@ -42,6 +48,37 @@ export default function CreateEventPage() {
     });
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'banner') => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (type === 'image') {
+        setImageFile(file);
+        setImagePreview(URL.createObjectURL(file));
+      } else {
+        setBannerFile(file);
+        setBannerPreview(URL.createObjectURL(file));
+      }
+    }
+  };
+
+  const uploadImage = async (file: File, folder: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('folder', folder);
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to upload image');
+    }
+
+    const data = await response.json();
+    return data.url;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -53,6 +90,22 @@ export default function CreateEventPage() {
     setIsLoading(true);
 
     try {
+      // Upload images first if they exist
+      let imageUrl = '';
+      let bannerUrl = '';
+
+      if (imageFile) {
+        toast.loading('Uploading event image...');
+        imageUrl = await uploadImage(imageFile, 'events/images');
+        toast.dismiss();
+      }
+
+      if (bannerFile) {
+        toast.loading('Uploading event banner...');
+        bannerUrl = await uploadImage(bannerFile, 'events/banners');
+        toast.dismiss();
+      }
+
       const response = await fetch("/api/events/create", {
         method: "POST",
         headers: {
@@ -72,6 +125,9 @@ export default function CreateEventPage() {
           ticketType: formData.ticketType,
           ticketPrice: formData.ticketPrice,
           totalTickets: formData.totalTickets,
+          feeBearer: formData.feeBearer,
+          imageUrl,
+          bannerUrl,
         }),
       });
 
@@ -110,6 +166,26 @@ export default function CreateEventPage() {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
+        {/* Payment Warning */}
+        {user && user.kycStatus !== 'approved' && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-300 rounded-lg">
+            <h3 className="font-semibold text-amber-900 mb-2">
+              ⚠️ KYC Verification Required
+            </h3>
+            <p className="text-sm text-amber-800 mb-3">
+              {user.kycStatus === 'not_submitted' && "You need to complete KYC verification to receive payments. You can create events, but won't receive payment split code until verified."}
+              {user.kycStatus === 'pending' && "Your KYC is under review. You can create events, but won't receive payments until approved."}
+              {user.kycStatus === 'rejected' && "Your KYC was rejected. Please resubmit for verification to receive payments."}
+            </p>
+            <Link
+              href={user.kycStatus === 'not_submitted' || user.kycStatus === 'rejected' ? "/dashboard/kyc" : "/dashboard/settings"}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors text-sm font-medium"
+            >
+              {user.kycStatus === 'not_submitted' || user.kycStatus === 'rejected' ? "Submit KYC" : "View Status"} →
+            </Link>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-8 space-y-8">
           {/* Basic Information */}
           <div>
@@ -168,6 +244,60 @@ export default function CreateEventPage() {
                   <option value="food-drink">Food & Drink</option>
                   <option value="entertainment">Entertainment</option>
                 </select>
+              </div>
+
+              {/* Event Image */}
+              <div>
+                <label htmlFor="eventImage" className="block text-sm font-medium text-gray-700 mb-2">
+                  Event Image (Flyer)
+                </label>
+                <p className="text-sm text-gray-500 mb-2">Recommended: 3:4 ratio (e.g., 600x800px)</p>
+                <input
+                  id="eventImage"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageChange(e, 'image')}
+                  className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#353595]"
+                />
+                {imagePreview && (
+                  <div className="mt-4 relative w-64 mx-auto">
+                    <div className="relative aspect-[3/4] w-full">
+                      <Image
+                        src={imagePreview}
+                        alt="Event preview"
+                        fill
+                        className="object-cover rounded-lg shadow-lg"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Event Banner */}
+              <div>
+                <label htmlFor="eventBanner" className="block text-sm font-medium text-gray-700 mb-2">
+                  Event Banner (Wide)
+                </label>
+                <p className="text-sm text-gray-500 mb-2">Recommended: 16:9 ratio (e.g., 1920x1080px)</p>
+                <input
+                  id="eventBanner"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageChange(e, 'banner')}
+                  className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#353595]"
+                />
+                {bannerPreview && (
+                  <div className="mt-4 relative w-full">
+                    <div className="relative aspect-[16/9] w-full">
+                      <Image
+                        src={bannerPreview}
+                        alt="Banner preview"
+                        fill
+                        className="object-cover rounded-lg shadow-lg"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -371,6 +501,46 @@ export default function CreateEventPage() {
                   placeholder="100"
                 />
               </div>
+
+              {/* Platform Fee Bearer - Only for paid events */}
+              {formData.ticketType === "paid" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Who Pays Platform Fee (8%)? *
+                  </label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, feeBearer: "organizer" })}
+                      className={`p-4 border-2 rounded-lg text-center transition-colors ${
+                        formData.feeBearer === "organizer"
+                          ? "border-[#353595] bg-blue-50"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                    >
+                      <div className="font-medium">I'll Pay</div>
+                      <div className="text-sm text-gray-600 mt-1">Fee deducted from my earnings</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, feeBearer: "buyer" })}
+                      className={`p-4 border-2 rounded-lg text-center transition-colors ${
+                        formData.feeBearer === "buyer"
+                          ? "border-[#353595] bg-blue-50"
+                          : "border-gray-300 hover:border-gray-400"
+                      }`}
+                    >
+                      <div className="font-medium">Buyer Pays</div>
+                      <div className="text-sm text-gray-600 mt-1">Added to ticket price</div>
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-2">
+                    {formData.feeBearer === "organizer" 
+                      ? "You'll receive 92% of the ticket price" 
+                      : "Buyers will pay ticket price + 8% platform fee"}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

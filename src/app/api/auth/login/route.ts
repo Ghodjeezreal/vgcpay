@@ -46,6 +46,7 @@ export async function POST(request: Request) {
           lastName: user.lastName,
           email: user.email,
           accountType: user.accountType,
+          isAdmin: user.isAdmin,
         }
       },
       { status: 200 }

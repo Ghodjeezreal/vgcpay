@@ -10,17 +10,26 @@ datasource db {
 }
 
 model User {
-  id           Int       @id @default(autoincrement())
-  firstName    String    @map("first_name") @db.VarChar(100)
-  lastName     String    @map("last_name") @db.VarChar(100)
-  email        String    @unique @db.VarChar(255)
-  passwordHash String    @map("password_hash") @db.VarChar(255)
-  accountType  String    @map("account_type") @db.VarChar(20)
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  id                      Int       @id @default(autoincrement())
+  firstName               String    @map("first_name") @db.VarChar(100)
+  lastName                String    @map("last_name") @db.VarChar(100)
+  email                   String    @unique @db.VarChar(255)
+  passwordHash            String    @map("password_hash") @db.VarChar(255)
+  accountType             String    @map("account_type") @db.VarChar(20)
+  isAdmin                 Boolean   @default(false) @map("is_admin")
+  paystackSplitCode       String?   @map("paystack_split_code") @db.VarChar(50)
+  kycStatus               String    @default("not_submitted") @map("kyc_status") @db.VarChar(20)
+  kycType                 String?   @map("kyc_type") @db.VarChar(20)
+  kycSubmittedAt          DateTime? @map("kyc_submitted_at")
+  kycApprovedAt           DateTime? @map("kyc_approved_at")
+  kycRejectedAt           DateTime? @map("kyc_rejected_at")
+  kycRejectionReason      String?   @map("kyc_rejection_reason") @db.Text
+  createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
   
   events       Event[]   @relation("OrganizerEvents")
   tickets      Ticket[]
+  kycRequest   KycRequest?
   
   @@map("users")
 }
@@ -28,6 +37,7 @@ model User {
 model Event {
   id           Int       @id @default(autoincrement())
   organizerId  Int       @map("organizer_id")
+  slug         String    @unique @db.VarChar(255)
   title        String    @db.VarChar(255)
   description  String    @db.Text
   category     String    @db.VarChar(50)
@@ -37,12 +47,16 @@ model Event {
   eventType    String    @map("event_type") @db.VarChar(20)
   venue        String?   @db.VarChar(255)
   location     String?   @db.Text
-  ticketType   String    @map("ticket_type") @db.VarChar(20)
-  ticketPrice  Decimal?  @map("ticket_price") @db.Decimal(10, 2)
-  totalTickets Int       @map("total_tickets")
-  ticketsSold  Int       @default(0) @map("tickets_sold")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  imageUrl           String?   @map("image_url") @db.Text
+  bannerUrl          String?   @map("banner_url") @db.Text
+  ticketType         String    @map("ticket_type") @db.VarChar(20)
+  ticketPrice        Decimal?  @map("ticket_price") @db.Decimal(10, 2)
+  platformFeePercent Decimal   @default(8.00) @map("platform_fee_percent") @db.Decimal(5, 2)
+  feeBearer          String    @default("organizer") @map("fee_bearer") @db.VarChar(20)
+  totalTickets       Int       @map("total_tickets")
+  ticketsSold        Int       @default(0) @map("tickets_sold")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at")
   
   organizer    User      @relation("OrganizerEvents", fields: [organizerId], references: [id], onDelete: Cascade)
   tickets      Ticket[]
@@ -63,4 +77,38 @@ model Ticket {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@map("tickets")
+}
+
+model KycRequest {
+  id                    Int       @id @default(autoincrement())
+  userId                Int       @unique @map("user_id")
+  kycType               String    @map("kyc_type") @db.VarChar(20)
+  
+  // Personal KYC fields
+  fullName              String?   @map("full_name") @db.VarChar(255)
+  dateOfBirth           DateTime? @map("date_of_birth") @db.Date
+  phoneNumber           String?   @map("phone_number") @db.VarChar(20)
+  address               String?   @db.Text
+  idType                String?   @map("id_type") @db.VarChar(50)
+  idNumber              String?   @map("id_number") @db.VarChar(100)
+  idDocumentUrl         String?   @map("id_document_url") @db.Text
+  
+  // Business KYC fields
+  businessName          String?   @map("business_name") @db.VarChar(255)
+  businessRegNumber     String?   @map("business_reg_number") @db.VarChar(100)
+  businessAddress       String?   @map("business_address") @db.Text
+  businessType          String?   @map("business_type") @db.VarChar(100)
+  cacDocumentUrl        String?   @map("cac_document_url") @db.Text
+  
+  // Bank details
+  bankName              String    @map("bank_name") @db.VarChar(100)
+  accountNumber         String    @map("account_number") @db.VarChar(20)
+  accountName           String    @map("account_name") @db.VarChar(255)
+  
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
+  
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("kyc_requests")
 }

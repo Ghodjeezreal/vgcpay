@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
+import Script from "next/script";
 import {
   FaCalendar,
   FaLaptop,
@@ -15,6 +17,7 @@ import {
 } from "react-icons/fa6";
 import { FaMapMarkerAlt } from "react-icons/fa";
 import toast, { Toaster } from "react-hot-toast";
+import { initializePaystack, generatePaymentReference } from "@/lib/paystack";
 
 interface Event {
   id: number;
@@ -29,13 +32,18 @@ interface Event {
   location: string | null;
   ticketType: string;
   ticketPrice: number | null;
+  platformFeePercent: number;
+  feeBearer: string;
   totalTickets: number;
   ticketsSold: number;
   ticketsAvailable: number;
+  imageUrl: string | null;
+  bannerUrl: string | null;
   organizer: {
     id: number;
     name: string;
     email: string;
+    paystackSplitCode?: string;
   };
   createdAt: string;
 }
@@ -108,12 +116,117 @@ export default function EventDetailPage() {
       return;
     }
 
+    if (!event) return;
+
     setIsPurchasing(true);
-    // TODO: Implement ticket purchase logic
-    setTimeout(() => {
-      toast.success("Ticket purchase feature coming soon!");
+
+    try {
+      // For free events, directly create ticket
+      if (event.ticketType === "free") {
+        const response = await fetch("/api/tickets/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            eventId: event.id,
+            paymentReference: generatePaymentReference(),
+            amount: 0,
+            paymentStatus: "success",
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          toast.success("Ticket registered successfully!");
+          fetchEvent(); // Refresh event data
+        } else {
+          toast.error(data.error || "Failed to register ticket");
+        }
+        setIsPurchasing(false);
+        return;
+      }
+
+      // For paid events, initialize Paystack payment
+      const amount = event.ticketPrice || 0;
+      const paymentRef = generatePaymentReference();
+
+      // Calculate platform fee (8% of ticket price)
+      const platformFeePercent = event.platformFeePercent || 8;
+      const platformFee = Math.round(amount * (platformFeePercent / 100) * 100); // in kobo
+
+      // Determine final amount based on who pays the fee
+      const totalAmount = event.feeBearer === "buyer" 
+        ? amount * (1 + platformFeePercent / 100) // Buyer pays: ticket + fee
+        : amount; // Organizer pays: just ticket price
+
+      // Prepare Paystack config
+      const paystackConfig: any = {
+        publicKey: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || "",
+        email: user.email,
+        amount: Math.round(totalAmount * 100), // Convert to kobo
+        metadata: {
+          custom_fields: [
+            {
+              display_name: "Event",
+              variable_name: "event_id",
+              value: event.id,
+            },
+            {
+              display_name: "User",
+              variable_name: "user_id",
+              value: user.id,
+            },
+          ],
+        },
+      };
+
+      // Add Split Code if available
+      if (event.organizer.paystackSplitCode) {
+        paystackConfig.split_code = event.organizer.paystackSplitCode;
+      }
+
+      paystackConfig.onSuccess = (reference: any) => {
+        // Create ticket after successful payment (non-async wrapper)
+        fetch("/api/tickets/purchase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            eventId: event.id,
+            paymentReference: reference.reference,
+            amount: amount,
+            paymentStatus: "success",
+          }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.ticket) {
+              toast.success("🎉 Ticket purchased successfully!");
+              fetchEvent(); // Refresh event data
+            } else {
+              toast.error(data.error || "Failed to create ticket");
+            }
+            setIsPurchasing(false);
+          })
+          .catch((error) => {
+            console.error("Ticket creation error:", error);
+            toast.error("Failed to create ticket");
+            setIsPurchasing(false);
+          });
+      };
+
+      paystackConfig.onClose = () => {
+        toast.error("Payment cancelled");
+        setIsPurchasing(false);
+      };
+
+      initializePaystack(paystackConfig);
+    } catch (error) {
+      console.error("Purchase error:", error);
+      toast.error("An error occurred. Please try again.");
       setIsPurchasing(false);
-    }, 1000);
+    }
   };
 
   if (isLoading) {
@@ -152,25 +265,87 @@ export default function EventDetailPage() {
 
   return (
     <>
+      <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
       <Toaster position="top-center" />
       <div className="min-h-screen bg-gray-50">
-        {/* Header Image */}
-        <div className="h-64 md:h-96 bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center relative">
-          <FaTicket className="text-8xl md:text-9xl text-white opacity-30" />
+        {/* Header Banner - Hidden on Mobile */}
+        <div className="hidden md:block h-64 md:h-96 bg-white from-purple-400 to-pink-400 relative overflow-hidden">
+          {event.bannerUrl ? (
+            <Image
+              src={event.bannerUrl}
+              alt={`${event.title} banner`}
+              fill
+              className="object-cover"
+              priority
+              sizes="100vw"
+            />
+          ) : (
+            <FaTicket className="text-8xl md:text-9xl text-white opacity-30" />
+          )}
           <Link
             href="/discover"
-            className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-white bg-opacity-20 hover:bg-opacity-30 text-white rounded-lg backdrop-blur-sm transition-colors"
+            className="absolute top-6 left-6 flex items-center gap-2 px-4 py-2 bg-[#353595] bg-opacity-20 hover:bg-opacity-30 text-white rounded-lg backdrop-blur-sm transition-colors z-10"
           >
             <FaArrowLeft />
             <span className="hidden md:inline">Back to Events</span>
           </Link>
         </div>
 
+        {/* Mobile Back Button */}
+        <div className="md:hidden bg-white border-b border-gray-200 px-6 py-4">
+          <Link
+            href="/discover"
+            className="inline-flex items-center gap-2 text-[#353595] hover:text-[#2a276f]"
+          >
+            <FaArrowLeft />
+            <span>Back to Events</span>
+          </Link>
+        </div>
+
         {/* Content */}
         <div className="max-w-7xl mx-auto px-6 py-8">
           <div className="grid lg:grid-cols-3 gap-8">
+            {/* Sidebar - Desktop: Left, Mobile: Top */}
+            <div className="lg:col-span-1 space-y-6 order-1">
+              {/* Event Flyer Image */}
+              {event.imageUrl && (
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="relative aspect-[3/4] w-full">
+                    <Image
+                      src={event.imageUrl}
+                      alt={event.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 1024px) 100vw, 33vw"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Organizer Info Card - Desktop Only */}
+              <div className="hidden lg:block bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Organized By
+                </h2>
+                <div className="flex items-center gap-4">
+                  <div className="bg-purple-100 p-4 rounded-full">
+                    <FaUser className="text-2xl text-[#353595]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {event.organizer.name}
+                    </p>
+                    <p className="text-gray-600 flex items-center gap-2 mt-1">
+                      <FaEnvelope className="text-sm" />
+                      {event.organizer.email}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Main Content */}
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-6 order-2">
               {/* Event Info Card */}
               <div className="bg-white rounded-lg shadow p-6 md:p-8">
                 {/* Category Badge */}
@@ -272,31 +447,8 @@ export default function EventDetailPage() {
                 </div>
               </div>
 
-              {/* Organizer Info Card */}
+              {/* Ticket Purchase Card */}
               <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                  Organized By
-                </h2>
-                <div className="flex items-center gap-4">
-                  <div className="bg-purple-100 p-4 rounded-full">
-                    <FaUser className="text-2xl text-[#353595]" />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-900 text-lg">
-                      {event.organizer.name}
-                    </p>
-                    <p className="text-gray-600 flex items-center gap-2 mt-1">
-                      <FaEnvelope className="text-sm" />
-                      {event.organizer.email}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar */}
-            <div className="lg:col-span-1">
-              <div className="bg-white rounded-lg shadow p-6 sticky top-6">
                 <div className="mb-6">
                   {event.ticketType === "paid" && event.ticketPrice ? (
                     <div>
@@ -304,6 +456,16 @@ export default function EventDetailPage() {
                       <p className="text-4xl font-bold text-[#353595]">
                         ₦{event.ticketPrice.toLocaleString()}
                       </p>
+                      {event.feeBearer === "buyer" && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded">
+                          <p className="text-sm text-gray-600">
+                            + Platform fee (8%): ₦{(event.ticketPrice * 0.08).toLocaleString()}
+                          </p>
+                          <p className="text-base font-semibold text-gray-900 mt-1">
+                            Total: ₦{(event.ticketPrice * 1.08).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div>
@@ -368,6 +530,27 @@ export default function EventDetailPage() {
                         }%`,
                       }}
                     ></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Organizer Info Card - Mobile Only */}
+              <div className="lg:hidden bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Organized By
+                </h2>
+                <div className="flex items-center gap-4">
+                  <div className="bg-purple-100 p-4 rounded-full">
+                    <FaUser className="text-2xl text-[#353595]" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-lg">
+                      {event.organizer.name}
+                    </p>
+                    <p className="text-gray-600 flex items-center gap-2 mt-1">
+                      <FaEnvelope className="text-sm" />
+                      {event.organizer.email}
+                    </p>
                   </div>
                 </div>
               </div>

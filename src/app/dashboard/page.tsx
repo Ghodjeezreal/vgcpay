@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FaTicket, FaRightFromBracket } from "react-icons/fa6";
+import { FaTicket, FaRightFromBracket, FaGear } from "react-icons/fa6";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast, { Toaster } from 'react-hot-toast';
@@ -100,13 +100,31 @@ export default function DashboardPage() {
               </h1>
               <p className="text-gray-600 mt-1">Manage your events and track performance</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <FaRightFromBracket />
-              <span>Logout</span>
-            </button>
+            <div className="flex items-center gap-3">
+              {user?.isAdmin && (
+                <Link
+                  href="/admin/dashboard"
+                  className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <FaGear />
+                  <span>Admin Dashboard</span>
+                </Link>
+              )}
+              <Link
+                href="/dashboard/settings"
+                className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-[#353595] rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                <FaGear />
+                <span>Settings</span>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                <FaRightFromBracket />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
